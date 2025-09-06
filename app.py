@@ -15,7 +15,7 @@ app = Flask(__name__, static_folder="", static_url_path="")
 
 # ----------------------- PUBG API config -----------------------
 # ตั้งค่า API KEY ผ่าน environment variable:  PUBG_API_KEY
-PUBG_API_KEY = os.environ.get("PUBG_API_KEY", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJmNWJkMmFhMC00NmFiLTAxM2UtYWZmZC02ZThjNzIzMTJmZDIiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzUyOTE1MjkzLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InBlcmZvcm1hbmNlLWFuIn0.LOqXQphW7_738pAyoPnjNFSuMvfjNAS4pFYIMSSsTEw")
+PUBG_API_KEY = os.environ.get("PUBG_API_KEY")
 PUBG_BASE = os.environ.get("PUBG_BASE", "https://api.pubg.com/shards/steam")
 
 PUBG_HEADERS = {
