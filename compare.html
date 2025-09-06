@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>เปรียบเทียบผู้เล่น PUBG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background: #f6f8fb; min-height: 100vh; font-family: 'Segoe UI','Prompt','Kanit',sans-serif; }
+    .header-bar { background:#222e3a; color:#fff; font-weight:bold; font-size:1.15em; padding:18px 24px; border-radius:16px 16px 0 0; margin-top:40px; }
+    .card { border-radius:18px; box-shadow:0 2px 16px #222e3a10; }
+    .card-body { background:#fff; border-radius:0 0 18px 18px; }
+    .compare-title { color:#2678e2; font-weight:bold; font-size:1.08em; }
+    .user-label { color:#2678e2; font-weight:bold; }
+    .pro-label { color:#f45; font-weight:bold; }
+    .stat-label { font-size:1em; color:#222; }
+    .stat-value { font-size:1.15em; font-weight:600; }
+    .loading { padding:40px 0 20px 0; }
+    .error-box { background:#ffd1d1; color:#a22; border-radius:10px; padding:20px; margin:40px auto; max-width:450px; }
+    @media (max-width: 600px) { .header-bar, .card { margin:6px !important; } }
+  </style>
+</head>
+<body>
+  <div class="container" style="max-width:700px;">
+    <div class="header-bar mb-3">เปรียบเทียบผู้เล่น PUBG</div>
+    <div class="card">
+      <div class="card-body" id="compare-content">
+        <div class="loading text-center">
+          <div class="spinner-border text-primary"></div>
+          <div>กำลังโหลด...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Helpers ----------
+    function toMin(sec){ return +(sec/60).toFixed(1); }
+    function percent(v){ return (v*100).toFixed(1); }
+    function getParam(name){
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name) || params.get(name.toLowerCase());
+    }
+
+    // ดึง match history เฉพาะ squad/team4 ทีละ 10 เกม
+    async function getStats(name){
+      let page=0, all=[];
+      while(all.length<10 && page<6){
+        const res = await fetch(`/api/matches/${encodeURIComponent(name)}?page=${page}`);
+        const data = await res.json();
+        if(!data.matches || !data.matches.length) break;
+        all = all.concat(
+          data.matches.filter(m => m.mode && m.mode.toLowerCase().includes("squad") && !m.mode.toLowerCase().includes("tdm"))
+        );
+        if(data.matches.length < 5) break;
+        page++;
+      }
+      return all.slice(0,10);
+    }
+
+    // สรุปสถิติที่จะใช้แสดงผล
+    function calcSummary(matches){
+      if(!matches || !matches.length) return null;
+      let kills=0, damage=0, survive=0, wins=0, maxHeadshot=0;
+      for (let m of matches){
+        kills += +m.kills || 0;
+        damage += +m.damage || 0;
+        survive += parseSurvive(m.timeAlive || "");
+        if ((+m.rank || 99) === 1) wins++;
+        maxHeadshot = Math.max(maxHeadshot, +m.headshots || 0);
+      }
+      const games = matches.length;
+      return {
+        avgKills: +(kills/games).toFixed(2),
+        avgDamage: +(damage/games).toFixed(1),
+        avgSurviveSec: Math.round(survive / games), // เฉลี่ยเป็นวินาที
+        avgSurviveMin: +((survive / games) / 60).toFixed(2), // นาทีทศนิยม (สำหรับกราฟ)
+        kd: +(kills/(games - wins || 1)).toFixed(2),   // ใกล้เคียง KD
+        winRate: +(wins/games*100).toFixed(1),
+        maxHeadshot
+      };
+    }
+
+    // แปลง "Xm Ys" -> วินาที
+    function parseSurvive(s){
+      if(typeof s === "number") return s;
+      let [min,sec] = [0,0];
+      if(s.includes("m")) min = parseInt(s);
+      if(s.includes("s")) sec = parseInt(s.split("m")[1]);
+      return min*60 + (sec||0);
+    }
+
+    async function main(){
+      const user = getParam("me") || getParam("user");
+      const pro  = getParam("pro");
+      if(!user || !pro){
+        document.getElementById("compare-content").innerHTML = `
+          <div class="error-box">Missing user or pro parameter in URL.</div>
+          <div class="text-center mt-3"><a href="index.html" class="btn btn-secondary">Back to Home</a></div>
+        `;
+        return;
+      }
+
+      document.getElementById("compare-content").innerHTML = `
+        <div class="loading text-center">
+          <div class="spinner-border text-primary"></div><div>Loading...</div>
+        </div>`;
+
+      try{
+        // 1) โหลด match 10 เกม
+        const [userMatches, proMatches] = await Promise.all([getStats(user), getStats(pro)]);
+        const userStats = calcSummary(userMatches);
+        const proStats  = calcSummary(proMatches);
+        if(!userStats || !proStats) throw "No enough match data to compare.";
+
+        // 1.1 K/D แบบจำนวนเต็ม (ใช้ทศนิยมหลักแรกตัดสิน: ≤0.4 ปัดลง, ≥0.5 ปัดขึ้น)
+        function kdInt(x){
+          const base = Math.floor(x);
+          const first = Math.floor((x - base) * 10 + 1e-9); // ทศนิยมหลักแรก
+          return first <= 4 ? base : base + 1;
+        }
+        const userKDInt = kdInt(userStats.kd);
+        const proKDInt  = kdInt(proStats.kd);
+
+        // Helper แปลงวินาทีเป็น M:SS
+        function formatMinSec(sec){
+          const m = Math.floor(sec/60);
+          const s = Math.floor(sec%60);
+          return `${m}:${String(s).padStart(2,'0')}`;
+        }
+        const userSurvStr = formatMinSec(userStats.avgSurviveSec);
+        const proSurvStr  = formatMinSec(proStats.avgSurviveSec);
+
+        // 2) HTML โครงหน้า
+        let html = `
+        <div class="row mb-3">
+          <div class="col-6 text-center user-label">${user}</div>
+          <div class="col-6 text-center pro-label">${pro}</div>
+        </div>
+
+        <!-- กราฟ Damage/Game -->
+        <canvas id="dmgChart" style="max-width:100%; height:160px; margin-bottom:30px"></canvas>
+
+        <!-- กราฟใหม่แบบแนวตั้ง -->
+        <canvas id="survivalChart" style="max-width:100%; height:200px; margin-bottom:30px"></canvas>
+        <canvas id="winChart" style="max-width:100%; height:200px; margin-bottom:30px"></canvas>
+
+        <!-- กราฟรวม: เหลือ K/D + Max Headshots -->
+        <canvas id="compareChart" style="max-width:100%; height:320px;"></canvas>
+
+        <div class="row mt-4 mb-2 justify-content-center">
+          <div class="col-md-10">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>สถิติ</th>
+                  <th class="user-label">${user}</th>
+                  <th class="pro-label">${pro}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>ดาเมจเฉลี่ย/เกม</td><td>${userStats.avgDamage}</td><td>${proStats.avgDamage}</td></tr>
+                <tr><td>เวลาอยู่รอดเฉลี่ย/เกม</td><td>${userSurvStr}</td><td>${proSurvStr}</td></tr>
+                <tr><td>อัตราการชนะเฉลี่ย/เกม (%)</td><td>${userStats.winRate}</td><td>${proStats.winRate}</td></tr>
+                <tr><td>ฆ่า/ตาย</td><td>${userKDInt}</td><td>${proKDInt}</td></tr>
+                <tr><td>ยิงหัวสูงสุด (1 เกม)</td><td>${userStats.maxHeadshot}</td><td>${proStats.maxHeadshot}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="text-center">
+          <a href="index.html?search=${encodeURIComponent(user)}" class="btn btn-outline-primary">กลับหน้าหลัก</a>
+        </div>`;
+
+        document.getElementById("compare-content").innerHTML = html;
+
+        // 3) วาดกราฟ
+        // 3a. Damage/Game (แนวนอน)
+        const ctxDmg = document.getElementById("dmgChart").getContext("2d");
+        new Chart(ctxDmg, {
+          type: "bar",
+          data: {
+            labels: [user, pro],
+            datasets: [{
+              label: "Avg Damage / Game",
+              data: [userStats.avgDamage, proStats.avgDamage],
+              backgroundColor: ["#2375d8","#e26363"]
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            plugins: { legend:{display:false}, title:{display:true, text:"ดาเมจเฉลี่ย/เกม"} },
+            responsive:true,
+            scales: { x: { beginAtZero:true } }
+          }
+        });
+
+// 3b. Survival (แนวตั้ง, ใช้วินาทีให้ตรงกับตาราง + ฟอร์แมตแกน/ทูลทิปเป็น M:SS)
+        const maxSurviveSec = Math.max(userStats.avgSurviveSec, proStats.avgSurviveSec);
+        const ctxSurv = document.getElementById("survivalChart").getContext("2d");
+        new Chart(ctxSurv, {
+          type: "bar",
+          data: {
+            labels: [user, pro],
+            datasets: [{
+              label: "Avg Survival",
+              data: [userStats.avgSurviveSec, proStats.avgSurviveSec],
+              backgroundColor: ["#2375d8","#e26363"]
+            }]
+          },
+          options: {
+            plugins: {
+              legend:{display:false},
+              title:{display:true, text:"เวลาอยู่รอดเฉลี่ย/เกม"},
+              tooltip:{
+                callbacks:{
+                  label:(ctx)=> `Avg Survival: ${formatMinSec(ctx.parsed.y)}`
+                }
+              }
+            },
+            responsive:true,
+            scales: {
+              y: {
+                beginAtZero:true,
+                suggestedMax: Math.ceil((maxSurviveSec*1.15)/30)*30,
+                ticks: { callback:(value)=> formatMinSec(value) }
+              }
+            }
+          }
+        });
+
+        // 3c. Win Rate (แนวตั้ง, 0–100)
+        const ctxWin = document.getElementById("winChart").getContext("2d");
+        new Chart(ctxWin, {
+          type: "bar",
+          data: {
+            labels: [user, pro],
+            datasets: [{
+              label: "Win Rate (%)",
+              data: [userStats.winRate, proStats.winRate],
+              backgroundColor: ["#2375d8","#e26363"]
+            }]
+          },
+          options: {
+            plugins: { legend:{display:false}, title:{display:true, text:"อัตราการชนะเฉลี่ย/เกม (%)"} },
+            responsive:true,
+            scales: { y: { beginAtZero:true, max:100 } }
+          }
+        });
+
+        // 3d. กราฟรวม (K/D int + Max HS)
+        const ctx = document.getElementById("compareChart").getContext("2d");
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: ["ฆ่า/ตาย", "ยิงหัวสูงสุด (1 เกม)"],
+            datasets: [
+              { label:user, backgroundColor:"#2375d8", data:[userKDInt, userStats.maxHeadshot] },
+              { label:pro,  backgroundColor:"#e26363", data:[proKDInt,  proStats.maxHeadshot] }
+            ]
+          },
+          options: {
+            responsive:true,
+            plugins: {
+              legend:{ position:"top" },
+            },
+            scales: { y: { beginAtZero:true } }
+          }
+        });
+
+      } catch (e) {
+        document.getElementById("compare-content").innerHTML = `
+          <div class="error-box">เกิดข้อผิดพลาด: ${e && e.message ? e.message : "ไม่สามารถโหลดข้อมูลเปรียบเทียบได้"}</div>
+          <div class="text-center mt-3"><a href="index.html" class="btn btn-secondary">กลับหน้าหลัก</a></div>
+        `;
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", main);
+  </script>
+</body>
+</html>

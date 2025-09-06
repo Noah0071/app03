@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>PTC Roster — รายชื่อผู้เล่น (Twire)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#f6f8fb; --ink:#1b2735; --muted:#6b7789; --card:#ffffff; --line:#e5edf7;
+      --head:#0f2138; --thead:#1a2f53; --accent:#ef9a00; --zebra:#fbfdff;
+    }
+    html,body{background:var(--bg); color:var(--ink); font-family:'Segoe UI','Prompt','Kanit',system-ui,sans-serif}
+    .header-bar{background:var(--head); color:#fff; border-bottom:1px solid #0b1b31; position:sticky; top:0; z-index:20}
+    .brand{font-weight:700}
+    .badge-soft{background:#203454; color:#dbeafe; border-radius:999px}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 4px 20px rgba(20,40,80,.06)}
+    .card-header{background:linear-gradient(0deg,#f6f9ff,#eef4ff); border-bottom:1px solid var(--line); border-radius:14px 14px 0 0}
+    .table-wrap{max-height:78vh; overflow:auto; border:1px solid var(--line); border-radius:12px}
+    table{margin:0; width:100%}
+    thead th{position:sticky; top:0; z-index:2; background:var(--thead); color:#fff; border-bottom:1px solid var(--line); font-weight:700; letter-spacing:.2px; font-size:15px; padding:.7rem .9rem}
+    tbody td{border-bottom:1px solid var(--line); font-size:16px; padding:.78rem .9rem; vertical-align:middle}
+    tbody tr:nth-child(odd){background:#fff}
+    tbody tr:nth-child(even){background:var(--zebra)}
+    tbody tr:hover{outline:2px solid #d9e6fb; background:#f9fbff}
+    .w-idx{width:68px}
+    .player-link{color:#0f2138; font-weight:700; text-decoration:none}
+    .player-link:hover{text-decoration:underline; color:#0b3ea6}
+    .muted{color:var(--muted)}
+    .loading{color:#3a4b63}
+    .kpi-badge{background:#eef4ff; border:1px solid #cfe0ff; color:#173b84; border-radius:999px; padding:.2rem .6rem; font-weight:700}
+    .kpi-grid .stat{border:1px solid var(--line); border-radius:10px; padding:.6rem .8rem; background:#fff}
+    .kpi-grid .name{color:#6b7789; font-size:.9rem}
+    .kpi-grid .val{font-size:1.1rem; font-weight:700}
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header-bar py-3">
+    <div class="container d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-3">
+        <div class="brand">PTC Tools</div>
+        <span class="badge badge-soft px-3 py-1">Twire Roster</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-light btn-sm" href="index.html">← กลับหน้าแรก</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container my-4">
+    <div class="card">
+      <div class="card-header d-flex flex-wrap align-items-center justify-content-between">
+        <div class="fs-6 fw-semibold">รายชื่อผู้เล่น (จาก Twire.gg)</div>
+        <div id="meta" class="muted small">—</div>
+      </div>
+
+      <div class="card-body">
+        <div id="loading" class="loading">กำลังโหลดรายชื่อ…</div>
+        <div id="error" class="alert alert-danger d-none mt-2"></div>
+
+        <div class="table-wrap d-none mt-2" id="wrap" role="region" aria-label="Player list">
+          <table class="table table-hover table-borderless align-middle" id="table">
+            <thead>
+              <tr>
+                <th class="w-idx">#</th>
+                <th>Player</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div id="empty" class="muted d-none mt-2">ไม่พบรายชื่อผู้เล่น</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Radar Chart -->
+  <div class="modal fade" id="playerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#0f2138; color:#fff;">
+          <h5 class="modal-title">
+            <span id="mPlayer">Player</span>
+            <span class="ms-2 kpi-badge">⚔️ K/D: <span id="mKD">-</span></span>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="muted small mb-3" id="mMeta">—</div>
+
+          <!-- KPIs -->
+          <div class="row g-3 kpi-grid mb-3">
+            <div class="col-6 col-md-3"><div class="stat"><div class="name">🗡️ Kills</div><div id="kpiKills" class="val">-</div></div></div>
+            <div class="col-6 col-md-3"><div class="stat"><div class="name">🤝 Assists</div><div id="kpiAst" class="val">-</div></div></div>
+            <div class="col-6 col-md-3"><div class="stat"><div class="name">🎯 HS Kills</div><div id="kpiHS" class="val">-</div></div></div>
+            <div class="col-6 col-md-3"><div class="stat"><div class="name">📏 Longest (m)</div><div id="kpiLong" class="val">-</div></div></div>
+          </div>
+
+          <!-- Radar -->
+          <canvas id="radar" height="220"></canvas>
+          <div class="text-center muted small mt-2">ค่าสเกล 0–100 ปรับจากค่าสูงสุดของทัวร์ในแต่ละมิติ</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" data-bs-dismiss="modal">ปิด</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  (function(){
+    'use strict';
+
+    // ====== Query ======
+    function getParam(k){ return new URLSearchParams(location.search).get(k); }
+    const tournamentId = getParam('tournament_id') || '2257';
+    const group = getParam('group') || '';
+    const round = getParam('round') || '';
+
+    // ====== DOM ======
+    const meta = document.getElementById('meta');
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error');
+    const wrap = document.getElementById('wrap');
+    const tbody = document.querySelector('#table tbody');
+    const emptyMsg = document.getElementById('empty');
+
+    // Modal + KPIs
+    const playerModal = new bootstrap.Modal(document.getElementById('playerModal'));
+    const mPlayer = document.getElementById('mPlayer');
+    const mKD = document.getElementById('mKD');
+    const mMeta = document.getElementById('mMeta');
+    const kpiKills = document.getElementById('kpiKills');
+    const kpiAst = document.getElementById('kpiAst');
+    const kpiHS = document.getElementById('kpiHS');
+    const kpiLong = document.getElementById('kpiLong');
+
+    // Radar chart
+    const radarCtx = document.getElementById('radar').getContext('2d');
+    let radar;
+
+    meta.textContent = `Tournament ID ${tournamentId} • group=${group || '—'} • round=${round || '—'}`;
+
+    let roster = [];
+    let maxes = {kd:0, kills:0, ast:0, hs:0, long:0};
+    let avgs  = {kd:0, kills:0, ast:0, hs:0, long:0};
+
+    function safeNum(v){ const n = Number(v); return isNaN(n)?0:n; }
+    const mean = arr => arr.length? arr.reduce((a,b)=>a+safeNum(b),0)/arr.length : 0;
+    const mmax = arr => arr.length? Math.max(...arr.map(safeNum)) : 0;
+
+    function computeBenchmarks(players){
+      maxes = {
+        kd:   mmax(players.map(p=>p.kd)),
+        kills:mmax(players.map(p=>p.kills_total)),
+        ast:  mmax(players.map(p=>p.assists_total)),
+        hs:   mmax(players.map(p=>p.headshot_kills)),
+        long: mmax(players.map(p=>p.longest_kill)),
+      };
+      avgs = {
+        kd:   Math.round(mean(players.map(p=>p.kd))*10)/10,
+        kills:Math.round(mean(players.map(p=>p.kills_total))*10)/10,
+        ast:  Math.round(mean(players.map(p=>p.assists_total))*10)/10,
+        hs:   Math.round(mean(players.map(p=>p.headshot_kills))*10)/10,
+        long: Math.round(mean(players.map(p=>p.longest_kill))*10)/10,
+      };
+    }
+
+    function to100(val, maxv){
+      const v = safeNum(val), m = safeNum(maxv);
+      if(m<=0) return 0;
+      const pct = (v/m)*100;
+      return Math.max(0, Math.min(100, pct));
+    }
+
+    function renderList(){
+      tbody.innerHTML = '';
+      if(!roster.length){
+        wrap.classList.add('d-none'); emptyMsg.classList.remove('d-none'); return;
+      }
+      emptyMsg.classList.add('d-none'); wrap.classList.remove('d-none');
+
+      roster.sort((a,b)=> (a.ign||'').localeCompare(b.ign||'', 'en', {sensitivity:'base'}));
+      roster.forEach((p,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-muted">${i+1}</td>
+          <td><a href="#" class="player-link" data-ign="${p.ign}">${p.ign}</a></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.querySelectorAll('.player-link').forEach(a=>{
+        a.addEventListener('click', (e)=>{
+          e.preventDefault();
+          const ign = a.dataset.ign;
+          const d = roster.find(x=>x.ign===ign);
+          if(d) openModal(d);
+        });
+      });
+    }
+
+    function destroyRadar(){ if(radar){ radar.destroy(); radar = null; } }
+
+    function openModal(d){
+      // KPIs จริง
+      mPlayer.textContent = d.ign;
+      mKD.textContent = d.kd ?? '-';
+      mMeta.textContent = `เฉลี่ยทัวร์ → ⚔️ KD ${avgs.kd} • 🗡️ Kills ${avgs.kills} • 🤝 Assists ${avgs.ast} • 🎯 HS ${avgs.hs} • 📏 Max Longest ${maxes.long} m`;
+      kpiKills.textContent = d.kills_total ?? '-';
+      kpiAst.textContent   = d.assists_total ?? '-';
+      kpiHS.textContent    = d.headshot_kills ?? '-';
+      kpiLong.textContent  = d.longest_kill ?? '-';
+
+      // แปลงเป็น 0–100 ด้วยค่าสูงสุดของทัวร์
+      const ply = [
+        to100(d.kd,            maxes.kd),
+        to100(d.kills_total,   maxes.kills),
+        to100(d.assists_total, maxes.ast),
+        to100(d.headshot_kills,maxes.hs),
+        to100(d.longest_kill,  maxes.long)
+      ];
+      const avg = [
+        to100(avgs.kd,   maxes.kd),
+        to100(avgs.kills,maxes.kills),
+        to100(avgs.ast,  maxes.ast),
+        to100(avgs.hs,   maxes.hs),
+        to100(avgs.long, maxes.long)
+      ];
+
+      destroyRadar();
+      radar = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+          labels: ['⚔️ K/D','🗡️ Kills','🤝 Assists','🎯 HS Kills','📏 Longest'],
+          datasets: [
+            {
+              label: 'Player',
+              data: ply,
+              borderColor: 'rgba(239,154,0,1)',
+              backgroundColor: 'rgba(239,154,0,0.25)',
+              borderWidth: 2,
+              pointRadius: 3
+            },
+            {
+              label: 'Average',
+              data: avg,
+              borderColor: 'rgba(120,130,150,0.8)',
+              backgroundColor: 'rgba(120,130,150,0.12)',
+              borderDash: [6,4],
+              borderWidth: 2,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (ctx)=> `${ctx.dataset.label}: ${Math.round(ctx.parsed.r)} / 100`
+              }
+            }
+          },
+          scales: {
+            r: {
+              beginAtZero: true,
+              suggestedMax: 100,
+              ticks: {
+                stepSize: 20,
+                showLabelBackdrop: false
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+              angleLines: { color: 'rgba(0,0,0,0.08)' },
+              pointLabels: { font: { size: 12 } }
+            }
+          }
+        }
+      });
+
+      playerModal.show();
+    }
+
+    // ====== Load ======
+    async function loadPlayers(){
+      loading.classList.remove('d-none');
+      errorBox.classList.add('d-none');
+      emptyMsg.classList.add('d-none');
+      wrap.classList.add('d-none');
+
+      try{
+        const url = `/api/twire/player-stats?tournament_id=${encodeURIComponent(tournamentId)}&group=${encodeURIComponent(group)}&round=${encodeURIComponent(round)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if(!res.ok || !data.ok){ throw new Error(data.error || (res.status+' '+res.statusText)); }
+
+        loading.classList.add('d-none');
+        meta.textContent = `Tournament ID ${tournamentId} • group=${group || '—'} • round=${round || '—'}${data.cached ? ' • cached' : ''}`;
+        roster = Array.isArray(data.players) ? data.players : [];
+
+        // คำนวณค่าสูงสุด/เฉลี่ยไว้ใช้ทำเรดาร์
+        computeBenchmarks(roster);
+
+        renderList();
+      }catch(e){
+        loading.classList.add('d-none');
+        errorBox.classList.remove('d-none');
+        errorBox.textContent = 'โหลดไม่สำเร็จ: ' + (e?.message || e);
+      }
+    }
+
+    loadPlayers();
+    document.getElementById('playerModal').addEventListener('hidden.bs.modal', ()=>{ if(radar){radar.destroy(); radar=null;} });
+  })();
+  </script>
+</body>
+</html>

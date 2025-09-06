@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>PUBG Match History</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    :root{
+      --ink:#222e3a; --bg:#f6f8fb; --card:#ffffff; --head:#222e3a; --muted:#8b99ae; --blue:#2375d8;
+    }
+    body{background:var(--bg); color:var(--ink); min-height:100vh; font-family:'Segoe UI','Prompt','Kanit',system-ui,sans-serif}
+    .header-bar{background:var(--head); color:#fff; box-shadow:0 2px 12px #222e3a20; position:sticky; top:0; z-index:10}
+    .brand{font-weight:700; letter-spacing:.2px}
+    .badge-soft{background:#2d3a4f; color:#dbeafe}
+    .content{max-width:1150px}
+    .panel{background:var(--card); border-radius:16px; box-shadow:0 2px 16px #222e3a13}
+    .panel-head{background:#0f2138; color:#fff; border-radius:16px 16px 0 0; padding:.9rem 1.2rem}
+    .panel-body{padding:1rem 1.2rem 1.2rem}
+    .match-row{border:0; border-bottom:1px solid #e8eef7; padding:14px 10px; transition:box-shadow .15s}
+    .match-row:hover{box-shadow:0 4px 18px #36aaff26}
+    .match-title{font-weight:600; color:var(--blue); text-transform:capitalize; font-size:1.05rem}
+    .stat-label{color:var(--muted); font-size:.92rem}
+    .stat-val{font-weight:600}
+    .rank-badge{background:#e7f0ff; color:#1e3a8a; border:1px solid #bfdbfe; padding:.25rem .5rem; border-radius:10px; font-weight:600}
+    .btn-ghost{border:1px solid #bed4ff; color:#1d4ed8; background:#eff6ff}
+    .list-pro .list-group-item{display:flex; justify-content:space-between; align-items:center}
+    .list-pro .list-group-item.active{background:#e8eef7; color:#111}
+    .search-wrap input{border-radius:10px}
+    .search-wrap .btn{border-radius:10px}
+  </style>
+</head>
+<body>
+
+  <!-- Header + PTC selector -->
+  <div class="header-bar py-3">
+    <div class="container content d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-3">
+        <div class="brand">PUBG Match History</div>
+        <!-- เปลี่ยน badge ให้เป็น Twire Manual -->
+        <span class="badge badge-soft rounded-pill">PTC Roster</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <label class="me-1 fw-semibold">เลือกปี PTC:</label>
+        <select id="ptc-year-selector" class="form-select form-select-sm" style="width:170px">
+          <option value="2024|1" selected>PTC 2025</option>
+        </select>
+        <button id="btn-load-roster" class="btn btn-sm btn-light">เปิดรายชื่อผู้เล่น</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container content my-4">
+    <div class="row g-4">
+      <!-- Left: Compare with pros -->
+      <div class="col-lg-4">
+        <div class="panel">
+          <div class="panel-head">Performance Analysis</div>
+          <div class="panel-body">
+            <div class="mb-3">
+              <div class="fw-semibold mb-2">เปรียบเทียบกับผู้เล่นโปร</div>
+              <div class="list-group list-pro">
+                <a href="#" class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                  <span>TGLTN</span>
+                  <button class="btn btn-sm btn-ghost" data-pro="TGLTN">Compare</button>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                  <span>Inonix</span>
+                  <button class="btn btn-sm btn-ghost" data-pro="Inonix">Compare</button>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                  <span>Ezqelusia</span>
+                  <button class="btn btn-sm btn-ghost" data-pro="Ezqelusia">Compare</button>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                  <span>xwudd</span>
+                  <button class="btn btn-sm btn-ghost" data-pro="xwudd">Compare</button>
+                </a>
+              </div>
+            </div>
+
+            <div class="mb-2 fw-semibold">ผู้เล่นของฉัน</div>
+            <input id="myPlayer" type="text" class="form-control" placeholder="เช่น Tilly4Four" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Matches -->
+      <div class="col-lg-8">
+        <div class="panel">
+          <div class="panel-head d-flex align-items-center justify-content-between">
+            <div>ประวัติแมตช์ล่าสุด</div>
+          </div>
+          <div class="panel-body">
+            <!-- Search -->
+            <div class="input-group search-wrap mb-3">
+              <input id="searchInput" type="text" class="form-control" placeholder="พิมพ์ชื่อผู้เล่น แล้วกดค้นหา" />
+              <button id="btnSearch" class="btn btn-primary">ค้นหา</button>
+            </div>
+
+            <!-- Match list -->
+            <div id="matchList" class="list-group mb-3"></div>
+            <div class="d-grid">
+              <button id="btnMore" class="btn btn-outline-primary">โหลดแมตช์เพิ่มเติม</button>
+            </div>
+            <div id="emptyMsg" class="text-center text-muted d-none mt-3">ไม่พบข้อมูล</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Map-code → pretty name
+  const MAP_NAME_TABLE = {
+    "Baltic_Main": "Erangel",
+    "Erangel_Main": "Erangel",
+    "Desert_Main": "Miramar",
+    "Savage_Main": "Sanhok",
+    "DihorOtok_Main": "Vikendi",
+    "Tiger_Main": "Taego",
+    "Taego_Main": "Taego",
+    "Kiki_Main": "Deston",
+    "Paramo_Main": "Paramo",
+    "Haven_Main": "Haven",
+    "Karakin_Main": "Karakin",
+    "Neon_Main": "Rondo"
+  };
+  function prettyMapName(code){ return code ? (MAP_NAME_TABLE[code] || code) : "-"; }
+
+(function(){
+  // ---------- PTC roster navigation ----------
+  const btnRoster = document.getElementById('btn-load-roster');
+  const sel = document.getElementById('ptc-year-selector');
+
+  function openRoster(){
+    const [year, phase] = (sel.value || '2024|1').split('|');
+    const url = `ptc_roster.html?year=${encodeURIComponent(year)}&phase=${encodeURIComponent(phase)}`;
+    // เปิดในแท็บใหม่ ตามแนวทาง "แสดงการ์ดตารางในหน้าใหม่"
+    window.open(url, '_blank');
+  }
+  if(btnRoster){ btnRoster.addEventListener('click', openRoster); }
+  // ไม่บังคับเปิดทันทีเมื่อเปลี่ยนค่า dropdown เพื่อหลีกเลี่ยง popup blocker
+
+  // ---------- Utilities ----------
+  function qs(name){ return new URLSearchParams(location.search).get(name); }
+  function el(tag, cls){ const e=document.createElement(tag); if(cls) e.className=cls; return e; }
+
+  // ---------- Search / matches ----------
+  const list = document.getElementById('matchList');
+  const btnMore = document.getElementById('btnMore');
+  const emptyMsg = document.getElementById('emptyMsg');
+  const searchInput = document.getElementById('searchInput');
+  const myPlayer = document.getElementById('myPlayer');
+  let page = 0, currentPlayer = '';
+
+  async function fetchMatches(player, pageNo){
+    const res = await fetch(`/api/matches/${encodeURIComponent(player)}?page=${pageNo}`);
+    const data = await res.json();
+    return data.matches || [];
+  }
+
+  function row(match){
+    const li = el('div','list-group-item match-row');
+    // header line
+    const head = el('div','d-flex justify-content-between align-items-center mb-1');
+    const title = el('div','match-title');
+    title.textContent = (match.mode || '-') + (match.map ? ' • ' + prettyMapName(match.map) : '');
+    head.appendChild(title);
+    const rank = el('span','rank-badge'); rank.textContent = `อันดับที่ ${match.rank ?? '-'}`;
+    head.appendChild(rank);
+    li.appendChild(head);
+
+    // stats line
+    const grid = el('div','row g-2');
+    grid.innerHTML = `
+      <div class="col-6 col-md-4"><div class="stat-label">ฆ่า</div><div class="stat-val">${match.kills ?? 0}</div></div>
+      <div class="col-6 col-md-4"><div class="stat-label">ดาเมจ</div><div class="stat-val">${(match.damage ?? 0).toLocaleString()}</div></div>
+      <div class="col-6 col-md-4"><div class="stat-label">น็อค</div><div class="stat-val">${match.dbno ?? 0}</div></div>
+      <div class="col-6 col-md-4"><div class="stat-label">เดินทาง</div><div class="stat-val">${match.traveled ?? '-'}</div></div>
+      <div class="col-6 col-md-4"><div class="stat-label">อยู่รอด</div><div class="stat-val">${match.timeAlive ?? '-'}</div></div>
+    `;
+    li.appendChild(grid);
+    return li;
+  }
+
+  async function doSearch(reset=true){
+    const player = searchInput.value.trim();
+    if(!player){ return; }
+    if(reset){ page = 0; list.innerHTML = ''; emptyMsg.classList.add('d-none'); }
+    currentPlayer = player;
+    const matches = await fetchMatches(player, page);
+    if(reset && matches.length === 0){
+      emptyMsg.classList.remove('d-none');
+    }else{
+      matches.forEach(m => list.appendChild(row(m)));
+      btnMore.disabled = matches.length === 0;
+    }
+  }
+
+  // buttons
+  document.getElementById('btnSearch').addEventListener('click', ()=>doSearch(true));
+  searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(true); });
+  btnMore.addEventListener('click', ()=>{ page += 1; doSearch(false); });
+
+  // compare buttons
+  document.querySelectorAll('[data-pro]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const me = (myPlayer.value || searchInput.value || '').trim();
+      const pro = btn.getAttribute('data-pro');
+      if(!me){ alert('กรุณากรอกชื่อผู้เล่นของคุณก่อน'); return; }
+      window.location.href = `compare.html?user=${encodeURIComponent(me)}&pro=${encodeURIComponent(pro)}`;
+    });
+  });
+
+  // init from ?search=
+  const q = qs('search');
+  if(q){ searchInput.value = q; myPlayer.value = q; doSearch(true); }
+})();
+</script>
+
+</body>
+</html>
