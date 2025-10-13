@@ -84,7 +84,7 @@
         <div class="modal-header" style="background:#0f2138; color:#fff;">
           <h5 class="modal-title">
             <span id="mPlayer">Player</span>
-            <span class="ms-2 kpi-badge">⚔️ K/D: <span id="mKD">-</span></span>
+            
           </h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
@@ -92,16 +92,40 @@
           <div class="muted small mb-3" id="mMeta">—</div>
 
           <!-- KPIs -->
-          <div class="row g-3 kpi-grid mb-3">
-            <div class="col-6 col-md-3"><div class="stat"><div class="name">🗡️ Kills</div><div id="kpiKills" class="val">-</div></div></div>
-            <div class="col-6 col-md-3"><div class="stat"><div class="name">🤝 Assists</div><div id="kpiAst" class="val">-</div></div></div>
-            <div class="col-6 col-md-3"><div class="stat"><div class="name">🎯 HS Kills</div><div id="kpiHS" class="val">-</div></div></div>
-            <div class="col-6 col-md-3"><div class="stat"><div class="name">📏 Longest (m)</div><div id="kpiLong" class="val">-</div></div></div>
+          <div class="row row-cols-2 row-cols-md-5 g-3 kpi-grid mb-3">
+            <div class="col"><div class="stat"><div class="name">⚔️ K/D</div><div id="kpiKD" class="val">-</div></div></div>
+            <div class="col"><div class="stat"><div class="name">🗡️ Kills</div><div id="kpiKills" class="val">-</div></div></div>
+            <div class="col"><div class="stat"><div class="name">🤝 Assists</div><div id="kpiAst" class="val">-</div></div></div>
+            <div class="col"><div class="stat"><div class="name">🎯 HS Kills</div><div id="kpiHS" class="val">-</div></div></div>
+            <div class="col"><div class="stat"><div class="name">📏 Longest (m)</div><div id="kpiLong" class="val">-</div></div></div>
           </div>
 
           <!-- Radar -->
           <canvas id="radar" height="220"></canvas>
           <div class="text-center muted small mt-2">ค่าสเกล 0–100 ปรับจากค่าสูงสุดของทัวร์ในแต่ละมิติ</div>
+  <!-- Player Summary Table (single player with averages) -->
+  <div class="mt-4">
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:40%">ตารางสรุปผู้เล่น</th>
+            <th id="sumName">-</th>
+            <th>ค่าเฉลี่ยทัวร์</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ค่าเฉลี่ยจำนวนการฆ่าต่อการตาย (K/D)</td><td id="sumKD">-</td><td id="avgKD">-</td></tr>
+          <tr><td>ค่าเฉลี่ยจำนวนการฆ่า (Kills)</td><td id="sumKills">-</td><td id="avgKills">-</td></tr>
+          <tr><td>ค่าเฉลี่ยช่วยเหลือเพื่อน (Assists)</td><td id="sumAst">-</td><td id="avgAst">-</td></tr>
+          <tr><td>ค่าเฉลี่ยจำวนการยิงหัว (HS Kills)</td><td id="sumHS">-</td><td id="avgHS">-</td></tr>
+          <tr><td>ค่าเฉลี่ยระยะยิงที่ทำได้ (Longest)</td><td id="sumLong">-</td><td id="avgLong">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- /Player Summary Table -->
+
         </div>
         <div class="modal-footer">
           <button class="btn btn-primary" data-bs-dismiss="modal">ปิด</button>
@@ -132,7 +156,7 @@
     // Modal + KPIs
     const playerModal = new bootstrap.Modal(document.getElementById('playerModal'));
     const mPlayer = document.getElementById('mPlayer');
-    const mKD = document.getElementById('mKD');
+    const kpiKD = document.getElementById('kpiKD');
     const mMeta = document.getElementById('mMeta');
     const kpiKills = document.getElementById('kpiKills');
     const kpiAst = document.getElementById('kpiAst');
@@ -209,12 +233,27 @@
     function openModal(d){
       // KPIs จริง
       mPlayer.textContent = d.ign;
-      mKD.textContent = d.kd ?? '-';
+      kpiKD.textContent = d.kd ?? '-' ;
       mMeta.textContent = `เฉลี่ยทัวร์ → ⚔️ KD ${avgs.kd} • 🗡️ Kills ${avgs.kills} • 🤝 Assists ${avgs.ast} • 🎯 HS ${avgs.hs} • 📏 Max Longest ${maxes.long} m`;
       kpiKills.textContent = d.kills_total ?? '-';
       kpiAst.textContent   = d.assists_total ?? '-';
       kpiHS.textContent    = d.headshot_kills ?? '-';
       kpiLong.textContent  = d.longest_kill ?? '-';
+      // Summary table (bottom)
+      const S = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = (v ?? '-'); };
+      S('sumName',  d.ign);
+      S('sumKD',    d.kd);
+      S('sumKills', d.kills_total);
+      S('sumAst',   d.assists_total);
+      S('sumHS',    d.headshot_kills);
+      S('sumLong',  d.longest_kill);
+      // tournament averages
+      S('avgKD',    avgs.kd);
+      S('avgKills', avgs.kills);
+      S('avgAst',   avgs.ast);
+      S('avgHS',    avgs.hs);
+      S('avgLong',  avgs.long);
+
 
       // แปลงเป็น 0–100 ด้วยค่าสูงสุดของทัวร์
       const ply = [

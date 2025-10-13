@@ -62,35 +62,70 @@
     }
 
     // สรุปสถิติที่จะใช้แสดงผล
+    function parseDistance(v){
+      // Return in kilometers (km)
+      if (v == null) return 0;
+      if (typeof v === 'number' && !isNaN(v)) return v; // assume km
+      let s = String(v).trim();
+      if (!s) return 0;
+      const num = parseFloat(s.replace(/,/g,''));
+      if (isNaN(num)) return 0;
+      if (/km/i.test(s)) return num;               // like "8.27 km"
+      if (/(^|\s)(m|เมตร)\b/i.test(s)) return num/1000; // meters to km
+      return num; // default assume km
+    }
+
     function calcSummary(matches){
       if(!matches || !matches.length) return null;
-      let kills=0, damage=0, survive=0, wins=0, maxHeadshot=0;
+      let kills=0, damage=0, survive=0, wins=0, travelKm=0;
       for (let m of matches){
-        kills += +m.kills || 0;
-        damage += +m.damage || 0;
-        survive += parseSurvive(m.timeAlive || "");
+        kills   += +m.kills || 0;
+        damage  += +m.damage || 0;
+        survive += parseSurvive(m.timeAlive || m.survive || m.time_survived || 0);
         if ((+m.rank || 99) === 1) wins++;
-        maxHeadshot = Math.max(maxHeadshot, +m.headshots || 0);
+        // travel from same field used on index: 'traveled'; fallback to other common keys
+        travelKm += parseDistance(m.traveled ?? m.travel ?? m.distance ?? m.distance_traveled ?? m.distanceTraveled ?? ((m.walkDistance||0)+(m.rideDistance||0)+(m.swimDistance||0)));
       }
       const games = matches.length;
       return {
         avgKills: +(kills/games).toFixed(2),
         avgDamage: +(damage/games).toFixed(1),
-        avgSurviveSec: Math.round(survive / games), // เฉลี่ยเป็นวินาที
-        avgSurviveMin: +((survive / games) / 60).toFixed(2), // นาทีทศนิยม (สำหรับกราฟ)
-        kd: +(kills/(games - wins || 1)).toFixed(2),   // ใกล้เคียง KD
+        avgSurviveSec: Math.round(survive / games),
+        avgSurviveMin: +((survive / games) / 60).toFixed(2),
+        kd: +(kills/(games - wins || 1)).toFixed(2),
         winRate: +(wins/games*100).toFixed(1),
-        maxHeadshot
+        avgTravelKm: +((travelKm / games)).toFixed(2)
       };
-    }
+    };
 
-    // แปลง "Xm Ys" -> วินาที
+    // แปลงเวลาที่หลากหลายเป็นวินาที (รองรับ M:SS, H:MM:SS, "Xm Ys" และ ISO PT)
     function parseSurvive(s){
-      if(typeof s === "number") return s;
-      let [min,sec] = [0,0];
-      if(s.includes("m")) min = parseInt(s);
-      if(s.includes("s")) sec = parseInt(s.split("m")[1]);
-      return min*60 + (sec||0);
+      if (s == null) return 0;
+      if (typeof s === 'number' && !isNaN(s)) return s;
+      s = String(s).trim();
+      if (!s) return 0;
+
+      // H:MM:SS or M:SS
+      let m = s.match(/^(\d{1,2}):([0-5]?\d)(?::([0-5]?\d))?$/);
+      if (m){
+        const hasHour = !!m[3];
+        const h = hasHour ? +m[1] : 0;
+        const mm = hasHour ? +m[2] : +m[1];
+        const ss = hasHour ? +m[3] : +m[2];
+        return h*3600 + mm*60 + ss;
+      }
+
+      // Xm Ys
+      let mm = /(\d+)\s*m/i.exec(s)?.[1];
+      let ss = /(\d+)\s*s/i.exec(s)?.[1];
+      if (mm || ss) return (+mm||0)*60 + (+ss||0);
+
+      // ISO8601 PT#H#M#S
+      let iso = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i.exec(s);
+      if (iso) return (+iso[1]||0)*3600 + (+iso[2]||0)*60 + (+iso[3]||0);
+
+      const n = parseFloat(s.replace(/,/g,''));
+      return isNaN(n) ? 0 : n;
     }
 
     async function main(){
@@ -166,7 +201,7 @@
                 <tr><td>เวลาอยู่รอดเฉลี่ย/เกม</td><td>${userSurvStr}</td><td>${proSurvStr}</td></tr>
                 <tr><td>อัตราการชนะเฉลี่ย/เกม (%)</td><td>${userStats.winRate}</td><td>${proStats.winRate}</td></tr>
                 <tr><td>ฆ่า/ตาย</td><td>${userKDInt}</td><td>${proKDInt}</td></tr>
-                <tr><td>ยิงหัวสูงสุด (1 เกม)</td><td>${userStats.maxHeadshot}</td><td>${proStats.maxHeadshot}</td></tr>
+                <tr><td>เดินทางเฉลี่ย/เกม (km)</td><td>${userStats.avgTravelKm}</td><td>${proStats.avgTravelKm}</td></tr>
               </tbody>
             </table>
           </div>
@@ -257,10 +292,10 @@
         new Chart(ctx, {
           type: "bar",
           data: {
-            labels: ["ฆ่า/ตาย", "ยิงหัวสูงสุด (1 เกม)"],
+            labels: ["ฆ่า/ตาย", "ค่าเดินทางเฉลี่ย/เกม (km)"],
             datasets: [
-              { label:user, backgroundColor:"#2375d8", data:[userKDInt, userStats.maxHeadshot] },
-              { label:pro,  backgroundColor:"#e26363", data:[proKDInt,  proStats.maxHeadshot] }
+              { label:user, backgroundColor:"#2375d8", data:[userKDInt, userStats.avgTravelKm] },
+              { label:pro,  backgroundColor:"#e26363", data:[proKDInt,  proStats.avgTravelKm] }
             ]
           },
           options: {
